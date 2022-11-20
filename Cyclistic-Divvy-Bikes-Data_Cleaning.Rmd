@@ -1,0 +1,159 @@
+---
+title: "Cyclistic-Divvy-Bikes-Data Cleaning"
+author: "Ibrahim Abdullah"
+date: "2022-11-18"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. Data Description
+
+This document outlines all of the steps taken to clean andclistic's r transform Cyaw datasets to prepare the data for the next stage of analysis. For the purpose of this case study, only data collected between January 2019 - December 2019 will be assessed. The dataset description can be located [here.](https://www.divvybikes.com/system-data)
+
+Please note that Cyclistic is a fictional company. Raw data has been collected by Motivate International Inc, the company which operates the City of Chicago's Divvy bicycle sharing service. The license to use this public dataset can be found [here.](https://www.divvybikes.com/data-license-agreement)
+
+```{r load packages}
+library(tidyverse)
+library(data.table)
+library(lubridate)
+```
+
+## 2. Upload and Combine Datasets
+### (i) Upload quarterly datasets
+```{r load individual datasets}
+Q1 <- read_csv("C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\DataSets\\Divvy_Trips_2019_Q1.csv")
+Q2 <- read_csv("C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\DataSets\\Divvy_Trips_2019_Q2.csv")
+Q3 <- read_csv("C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\DataSets\\Divvy_Trips_2019_Q3.csv")
+Q4 <- read_csv("C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\DataSets\\Divvy_Trips_2019_Q4.csv")
+```
+### (ii) Check structure of individual datasets
+``` {r check structure}
+str(Q1)
+str(Q2)
+str(Q3)
+str(Q4)
+```
+### (iii) Merge all 4 quarters of datasets
+``` {r merge all datasets}
+all_trips <- bind_rows(Q1, Q2, Q3, Q4)
+
+```
+## 3. Preparing Data
+### (i) Changing date types from character to dates for analysis
+``` {r clean and prepare data}
+# Remove gender, birthyear as they were not included in all datasets. Columns day_of_week and ride_length also removed as they will be calculated
+# further in the preparation code
+all_trips <- all_trips %>% select(-c("gender", "birthyear", "ride_length", "day_of_week"))
+# Change start_time string type 
+all_trips$start_time <- dmy_hms(all_trips$start_time)
+# Change end_time string type 
+all_trips$end_time <- dmy_hms(all_trips$end_time)
+# Order by date 
+all_trips <- all_trips %>% arrange(start_time)
+View(all_trips)
+```
+
+### (ii) Calculate ride length
+``` {r ride length}
+# Calculate time difference in seconds 
+all_trips$ride_length <- difftime(all_trips$end_time, all_trips$start_time, units = "secs") 
+# Change string type to numeric 
+all_trips$ride_length <- as.numeric(as.character(all_trips$ride_length))
+View(all_trips)
+```
+
+### (iii) Separate day, month, year by columns
+``` {r separate cols for d, m y}
+# Year
+all_trips$year <- format(all_trips$start_time, "%Y")
+
+# Month
+all_trips$month <- format(all_trips$start_time, "%m")
+
+# Week
+all_trips$week <- format(all_trips$start_time, "%W")
+
+# Day
+all_trips$day <- format(all_trips$start_time, "%d")
+
+# Day of week
+all_trips$day_of_week <- format(all_trips$start_time, "%A")
+
+# Date, YYYY-MM-DD
+all_trips$YMD <- format(all_trips$start_time, "%Y-%m-%d")
+
+# Time of Day, HH:MM:SS
+all_trips$ToD <- format(all_trips$start_time, "%H:%M:%S")
+
+```
+
+## 4. Data Cleaning
+### (i) Remove rows with ride length < 0
+```{r remove negative ride length values}
+all_trips_cleaned <- all_trips %>% filter(!(ride_length < 0))
+
+```
+
+### (ii) Remove incomplete rows 
+``` {r remove blanks}
+all_trips_cleaned <- all_trips_cleaned %>% filter(!(is.na(from_station_name) | from_station_name == "")) %>% filter(!(is.na(to_station_name) | to_station_name == ""))
+
+```
+
+### (iii) Remove tests
+``` {r upper case letter test}
+
+# Create a data frame to check if capitalized station names are test rides
+cap_station_name_check <- all_trips_cleaned %>% filter(str_detect(from_station_name, "[:upper:]") & !str_detect(from_station_name, "[:lower:]")) %>%
+  group_by(from_station_name) %>% count(from_station_name)
+
+```
+
+Identified capitalized station name results were for test and maintenance purposes. Should be removed from all_trips_cleaned_dataset
+
+``` {r remove upper case results}
+# remove capitalized station name results
+all_trips_cleaned <- all_trips_cleaned %>% 
+  filter(!(str_detect(from_station_name, "[:upper:]") & !str_detect(from_station_name, "[:lower:]")))
+
+```
+
+### (iv) Check trip ids for duplicates
+
+``` {r trip_id column check}
+
+trip_id_check <- all_trips_cleaned %>%
+  count(trip_id) %>% filter(n > 1)
+
+```
+
+## 4. Save the dataset
+
+### (i) Cleaned dataset
+The cleaned data set will be saved as a csv.
+
+``` {r all_trips_cleaned save}
+
+fwrite(
+  all_trips_cleaned, "C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\all_trips_clean.csv", 
+  col.names = TRUE, row.names = FALSE)
+
+```
+
+### (ii) Additional useful datasets
+
+``` {r}
+
+fwrite(all_trips, "C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\all_trips_raw.csv",
+       col.names = TRUE, row.names = FALSE)
+
+```
+
+
+
+
+
+  
