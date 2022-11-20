@@ -1,0 +1,156 @@
+---
+title: "Divvy Bike Ride Analysis Report"
+author: "Ibrahim Abdullah"
+date: "`r Sys.Date()`"
+output:
+  html_notebook
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+install.packages("rmdformats")
+library(knitr)
+library(rmdformats)
+opts_chunk$set(echo=FALSE,
+               prompt=FALSE,
+               comment=NA,
+               message=FALSE,
+               warning=FALSE,
+               results="hide")
+opts_knit$set(width=75)
+
+```
+
+# 1. Introduction
+
+Established in 2016, Cyclistic is a bike-share offering service located in Chicago, USA. Cyclistic currently offers more than 5,800 bicycles that are geo-tracked and locked into a network of over 690 stations across Chicago. The bikes can be unlocked from one station and returned to another station in the system anytime. 
+The Cyclistic team have recently concluded that annual memberships are more profitable than casual riders. Furthermore, the team have noted that while 30% of users use the bikes for their work commute, the majority of Cyclistic users ride for leisure. This report will assess how existing Cyclistic causal riders can be encouraged to convert to annual memberships. 
+
+# 2. Data Processing 
+
+Cyclistic have provided historical trip data to be analysed. For the purpose of this analysis, only data between January  2019 and December 2019 will be assessed. The data has already been processed to remove trips that were below 60 seconds in length (potentially false starts or users trying to re-dock a bike to ensure it was secure). The license to use this dataset can be located [here.](https://www.divvybikes.com/data-license-agreement)
+
+Due to the large file sizes, R has been used to clean and process the large datasets.
+
+The data has been cleaned by way of merging all 4 quarterly datasets into one, deleting incomplete data elements, removing test station results, removing negative ride lengths and summarising the dataset by date and time variables. The full data cleaning process has been documented in "Data Cleaning". 
+
+The cleaned dataset has been saved under the file name "all_trips_cleaned".
+
+``` {r load packages}
+library(tidyverse)
+library(data.table)
+library(ggplot2)
+library(viridis)
+```
+
+```{r load dataset}
+all_trips_clean <- fread("C:\\Users\\Ibrahim\\Desktop\\Google Data Analytics Course\\Capstone Projects\\Cyclist Case Study\\all_trips_clean.csv")
+```
+
+# 3. Analysis
+## (i) Most Popular Time of Year
+``` {r heat map data}
+# Arrange weekdays in order
+all_trips_clean$day_of_week <- ordered(
+  all_trips_clean$day_of_week, 
+  levels = c("Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday")
+)
+
+#data frame to summarize number of trips by date
+heat_map_data <- all_trips_clean %>% 
+  select(YMD, day_of_week, week, year) %>%
+  group_by(YMD) %>% mutate(numtrips = n()) %>% 
+  distinct(YMD, .keep_all = TRUE)
+
+```
+
+``` {r plot heat map}
+# Create heat map to show most popular time of year
+
+P1 <- ggplot(heat_map_data, aes(x = week, y = day_of_week,
+                                fill = numtrips)) + 
+  scale_fill_viridis(option = "D", direction = 1,
+                     name = "Number of trips") + 
+  geom_tile(colour = "white",
+            na.rm = FALSE) + facet_wrap(
+              "year", ncol = 1) +
+  scale_y_discrete(limits = rev) + scale_x_continuous(
+    expand = c(0, 0),
+    breaks = seq(1, 52, length = 12),
+    labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+               "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+    ) + theme(axis.title = element_blank())
+
+P1
+            
+```
+The above heat map shows that the summer months are the most popular time of year for Cyclistic. In addition, the heat map demonstrates that the weekends are the most popular time of week.
+
+## (ii) Most Popular Rider Type
+
+``` {r bar chart data}
+# Number of rides by rider type
+all_trips_clean %>% group_by(usertype, day_of_week) %>%
+  summarise(number_of_rides = n(), 
+            average_duration=mean(ride_length)) %>%
+  arrange(usertype, day_of_week) %>%
+  ggplot(aes(x = day_of_week, y = number_of_rides, fill = usertype)) + geom_col(position = "dodge") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5)) 
+
+
+```
+From the above bar chart, it can be inferred that the number of casual riders increases as weekend approaches whereas the number of member riders stays consistently high during weekdays, possibly due to the members using the bikes for daily work commute or similar routines.
+
+## (iii) Average Ride Duration
+
+``` {r average duration}
+
+# Average duration visualization
+all_trips_clean %>% group_by(usertype, day_of_week) %>%
+  summarise(number_of_rides = n(), average_duration = mean(ride_length)) %>% arrange(usertype, day_of_week) %>%
+  ggplot(aes(x=day_of_week, y=average_duration, fill =usertype)) + geom_col(position = "dodge") + theme(axis.text.x = element_text(angle = 45, vjust = 0.5))
+
+```
+It can be inferred that subscribers (members) use bikes consistently without major variation in the daily ride duration whereas the casual rides tend to ride more on weekends as compared to weekdays. Overall, the average duration of bike rides for casual riders is drastically more than the members.
+
+#4. Descriptive Analysis
+
+``` {r statistic summary}
+# Calculate mean, median, mode
+getmode <- function(v) { 
+  uniqv <- unique(v) 
+  uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+all_trips_clean$ToD_convert <- as.POSIXct(all_trips_clean$ToD, format = "%H:%M:%S")
+
+
+# Create a summary data frame
+statistic <- all_trips_clean %>%
+  group_by(usertype) %>% summarise(
+    avg_ride_length_mins = (mean(ride_length, na.rm = TRUE))/60,
+    mode_day_of_week = getmode(day_of_week),
+    mode_month = getmode(month),
+    mode_time_of_day = getmode(ToD),
+    avg_time_of_day = format(mean(ToD_convert, na.rm = TRUE), "%H:%M:%S")
+  )
+
+```
+
+``` {r show statistics}
+kable(head(statistic))
+
+```
+
+
+#5. Recommendations
+
+As per the analysis performed above, following strategies can be implemented by Cyclistic:-
+
+***1. Digital marketing campaign showing Cyclistic bikes being used in a Chicago resident's everyday life***
+
+***2. Advertising price benefit of annual memberships***
+
+***3. Targeted advertisement to casual riders focusing on digital campaigns emphasizing the health benefit of using bikes for daily commute*** 
+
+
+
